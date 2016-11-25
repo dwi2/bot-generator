@@ -8,12 +8,12 @@ const providers = {
 
 const handler = ({provider, data}, promise) => {
   try {
-    const targetProvider = providers[provider];
-    if (targetProvider) {
-      targetProvider({ body: data.body });
-      promise.resolve(`Handled ${provider} data: ${data.body}`);
+    const targetServiceProvider = providers[provider];
+    if (targetServiceProvider) {
+      targetServiceProvider(data);
+      promise.resolve(`Handled request with ${provider} handler`);
     } else {
-      throw new Error(`No ${provider} provider available`);
+      throw new Error(`No ${provider} handler available`);
     }
   } catch(exception) {
     promise.reject(`[webhookHandler.handler] ${exception}`);
