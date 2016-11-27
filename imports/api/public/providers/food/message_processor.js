@@ -1,9 +1,11 @@
 import { FoodItems } from '../../../food_items.js';
 import { FoodOrders } from '../../../food_orders.js';
 import { FoodKeywords } from '../../../food_keywords.js';
+import { FoodCustomers } from '../../../food_customers.js';
 import { FoodCustomerStates } from '../../../food_customer_states.js';
 import { Bots } from '../../../bots.js';
 import Messages from '/imports/messages';
+import Line from '/imports/line';
 
 export default messageProcessor = {
   _print: (botUuid, msgEvent) => {
@@ -31,19 +33,28 @@ export default messageProcessor = {
     }
   },
 
-  _composeMenu: (botUuid) => {
-    var bot = Bots.get(botUuid);
-    var foodItems = FoodItems.find({botUuid: botUuid}).fetch();
-    var menu = {
+  _generateEmptyCarousel: (altText) => {
+    return {
       type: 'template',
-      altText: bot.name,
+      altText: altText,
       template: {
-        type: 'carousel'
+        type: 'carousel',
+        columns: []
       }
     };
+  },
 
-    menu.template.columns = foodItems.map((foodItem) => {
-      return {
+  _composeMenusInArray: (botUuid) => {
+    var menus = [];
+    var bot = Bots.get(botUuid);
+    var foodItems = FoodItems.find({botUuid: botUuid}).fetch();
+    var carousel = messageProcessor._generateEmptyCarousel(bot.name);
+    foodItems.forEach((foodItem) => {
+      if (carousel.template.columns.length >= 5) {
+        menus.push(carousel);
+        carousel = messageProcessor._generateEmptyCarousel(bot.name);
+      }
+      let column = {
         thumbnailImageUrl: foodItem.imageUrl,
         title: foodItem.name,
         text: foodItem.price + '円',
@@ -56,10 +67,11 @@ export default messageProcessor = {
           label: 'ー１',
           data: JSON.stringify({action: 'remove', itemId: foodItem._id})
         }]
-        // thumbnailImageUrl
       };
+      carousel.template.columns.push(column);
     });
-    return menu;
+    menus.push(carousel);
+    return menus;
   },
 
   _composeOrderReply: (botUuid, customerId) => {
@@ -125,6 +137,20 @@ export default messageProcessor = {
     });
   },
 
+  _getCustomerProfile: (botUuid, customerId) => {
+    var bot = Bots.get(botUuid);
+    return Line.profile(customerId, bot.channelAccessToken);
+  },
+
+  _updateCustomerProfile: (botUuid, customerId) => {
+    var customerProfile = FoodCustomers.get(customerId);
+    if (!customerProfile) {
+      console.log(`we do not have profile of ${customerId}, fetch it from LINE`);
+      let lineProfile = messageProcessor._getCustomerProfile(botUuid, customerId);
+      FoodCustomers.renew(lineProfile);
+    }
+  },
+
   _handlePostback: (botUuid, customerId, postback, replyToken) => {
     var data = JSON.parse(postback.data);
     if (typeof data !== 'object') {
@@ -146,7 +172,6 @@ export default messageProcessor = {
           messageProcessor._sendMessage(
             botUuid, customerId, replyToken,
             {type: 'text', text: 'ご住所を伺ってよろしいでしょうか'});
-          // TODO send thank you message and ask user to share location
           break;
         case 'cancel':
           FoodCustomerStates.goToStandBy(botUuid, customerId);
@@ -167,15 +192,18 @@ export default messageProcessor = {
       return;
     }
 
+    // update customer data if we don't have it
+    messageProcessor._updateCustomerProfile(botUuid, customerId);
+
     // if user is in FoodCustomerStates.STAND_BY and give `keywords` in text message
     if (typeof msgBody.text === 'string' &&
         FoodKeywords.containsKeywords(botUuid, msgBody.text) &&
         FoodCustomerStates.isStandBy(botUuid, customerId)) {
-      let menu = messageProcessor._composeMenu(botUuid);
+      let menusInArray = messageProcessor._composeMenusInArray(botUuid);
       let instruction = messageProcessor._composeTextMessage(
         'ご注文は以上でよろしいたら、「お会計」や「checkout」などを入れてください');
-      console.log(`got keyword, send menu`);
-      messageProcessor._sendMessage(botUuid, customerId, replyToken, [menu, instruction]);
+      menusInArray.push(instruction);
+      messageProcessor._sendMessage(botUuid, customerId, replyToken, menusInArray);
       FoodCustomerStates.goToOrdering(botUuid, customerId);
     } else if (FoodCustomerStates.isOrdering(botUuid, customerId)) {
       let billingWords = ['checkout', '会計', '勘定', '終', '完了', '以上', 'とりあえず'];
@@ -228,6 +256,7 @@ export default messageProcessor = {
         let keywords = FoodKeywords.getKeywords(botUuid);
         let welcomeMessage = messageProcessor._composeTextMessage(`ご注文は「${keywords.join('」や「')}」を入れてください`);
         messageProcessor._sendMessage(botUuid, customerId, replyToken, welcomeMessage);
+        FoodCustomers.renew(messageProcessor._getCustomerProfile(botUuid, customerId));
         break;
       case 'unfollow':
         break;

@@ -15,6 +15,7 @@ Meteor.startup(() => {
   FoodKeywords.remove({});
   FoodCustomerStates.remove({});
   Bots.remove({});
+  // Don't delete record of FoodCustomers because it is fetched from LINE
 
   var settings = utils.ChannelSettings.get(SUSHI_BOT_UUID);
   var foodItemsData = [
@@ -40,6 +41,30 @@ Meteor.startup(() => {
       name: 'いなり',
       price: 500,
       imageUrl: 'https://dl.dropboxusercontent.com/u/19608428/images/inarisushi.jpg',
+      botUuid: SUSHI_BOT_UUID
+    },
+    {
+      name: '散らし一人前',
+      price: 1000,
+      imageUrl: 'https://dl.dropboxusercontent.com/u/19608428/images/chirashi.jpg',
+      botUuid: SUSHI_BOT_UUID
+    },
+    {
+      name: '上散らし一人前',
+      price: 1500,
+      imageUrl: 'https://dl.dropboxusercontent.com/u/19608428/images/uechirashi.jpg',
+      botUuid: SUSHI_BOT_UUID
+    },
+    {
+      name: '茶碗むし',
+      price: 600,
+      imageUrl: 'https://dl.dropboxusercontent.com/u/19608428/images/chawanmushi.jpg',
+      botUuid: SUSHI_BOT_UUID
+    },
+    {
+      name: '赤出し',
+      price: 400,
+      imageUrl: 'https://dl.dropboxusercontent.com/u/19608428/images/akadashi.jpg',
       botUuid: SUSHI_BOT_UUID
     }
   ];
