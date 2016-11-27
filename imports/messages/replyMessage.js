@@ -13,7 +13,7 @@ let replyMessage = (options) => {
     return;
   }
 
-  HTTP.post(replyEndpoint, {
+  return HTTP.post(replyEndpoint, {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${channelAccessToken}`

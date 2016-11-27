@@ -9,11 +9,6 @@ if (Meteor.isServer) {
   });
 }
 
-// id: uuid
-// name: string
-// price: number
-// image_url: string
-// bot_uuid: uuid
 Meteor.methods({
   'foodItems.insert'(name, price, botUuid, imageUrl) {
     check(name, String);
@@ -44,3 +39,7 @@ Meteor.methods({
     FoodItems.update({_id: id}, )
   }
 });
+
+FoodItems.get = (foodItemId) => {
+  return FoodItems.findOne({_id: foodItemId});
+};
