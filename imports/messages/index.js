@@ -1,7 +1,7 @@
 import replyMessage from './replyMessage';
-import templateMessage from './templateMessage';
+import pushMessage from './pushMessage';
 
 export default {
   replyMessage: replyMessage,
-  templateMessage: templateMessage,
+  pushMessage: pushMessage,
 };
