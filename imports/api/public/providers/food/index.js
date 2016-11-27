@@ -1,8 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import messageProcessor from './message_processor';
 
-var replyTokens = {};
-
 const handler = (options) => {
   try {
     // console.log(options.params._uuid);
@@ -11,8 +9,7 @@ const handler = (options) => {
     var msgEvents = options.body.events;
     msgEvents.forEach((evt) => {
       let botUuid = options.params._uuid;
-      let tokenObject = messageProcessor.parse(botUuid, evt);
-      replyTokens[botUuid] = tokenObject;
+      messageProcessor.parse(botUuid, evt);
     });
 
   } catch (exception) {
