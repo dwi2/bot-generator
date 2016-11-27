@@ -224,8 +224,6 @@ export default messageProcessor = {
       case 'postback':
         messageProcessor._handlePostback(botUuid, customerId, msgEvent.postback, replyToken);
         break;
-      // {"type":"follow","replyToken":"ec3c7ce86ddc422a817bf85ddd7b17e6","source":{"userId":"Ue03c484ff991ff3df47e30175f55fc28","type":"user"},"timestamp":1480258345113}
-      // {"type":"unfollow","source":{"userId":"U42f3ab920ba4353f79e60ef83aca4d33","type":"user"},"timestamp":1480258989646}
       case 'follow':
         let keywords = FoodKeywords.getKeywords(botUuid);
         let welcomeMessage = messageProcessor._composeTextMessage(`ご注文は「${keywords.join('」や「')}」を入れてください`);
