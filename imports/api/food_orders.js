@@ -33,6 +33,49 @@ FoodOrders.getOngoingOne = (botUuid, customerId) => {
   return ongoingOrder;
 };
 
+FoodOrders.ongoingOrderHasAnyItem = (botUuid, customerId) => {
+  var ongoingOrder = FoodOrders.getOngoingOne(botUuid, customerId);
+  if (!ongoingOrder) {
+    return false;
+  }
+
+  return ongoingOrder.items && ongoingOrder.items.length > 0;
+};
+
+FoodOrders.confirm = (botUuid, customerId) => {
+  var order = FoodOrders.getOngoingOne(botUuid, customerId);
+  if (order) {
+    FoodOrders.update({
+      _id: order._id
+    }, {
+      $set: {
+        confirmed: true
+      }
+    });
+  }
+};
+
+FoodOrders.getConfirmedOne = (botUuid, customerId) => {
+  return FoodOrders.findOne({
+    botUuid: botUuid,
+    customerId: customerId,
+    confirmed: true
+  });
+};
+
+FoodOrders.storeAddress = (botUuid, customerId, address) => {
+  var order = FoodOrders.getConfirmedOne(botUuid, customerId);
+  if (order) {
+    FoodOrders.update({
+      _id: order._id
+    }, {
+      $set: {
+        address: address
+      }
+    });
+  }
+};
+
 FoodOrders.addItem = (botUuid, customerId, foodItemId) => {
   var ongoingOrder = FoodOrders.getOngoingOne(botUuid, customerId);
   ongoingOrder.items.push(foodItemId);

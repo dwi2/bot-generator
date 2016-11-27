@@ -10,11 +10,6 @@ export default messageProcessor = {
     console.log(JSON.stringify(msgEvent));
   },
 
-  _containsBotKeywords: (botUuid, msgBody) => {
-    var result = FoodKeywords.findOne({botUuid: botUuid});
-    return messageProcessor._containsWord(result.keywords, msgBody);
-  },
-
   _containsWord: (words, msgBody) => {
     if (msgBody.type !== 'text') {
       return false;
@@ -26,6 +21,13 @@ export default messageProcessor = {
       });
     } else {
       return msgBody.text.toLowerCase().indexOf(words.toLowerCase()) > -1;
+    }
+  },
+
+  _composeTextMessage: (text) => {
+    return {
+      type: 'text',
+      text: text
     }
   },
 
@@ -67,10 +69,7 @@ export default messageProcessor = {
       return;
     }
 
-    let msgObject = {
-      type: 'text',
-      text: ''
-    };
+    let msgObject = messageProcessor._composeTextMessage('');
 
     let itemCount = {};
     order.items.forEach((x) => {
@@ -88,6 +87,35 @@ export default messageProcessor = {
     return msgObject;
   },
 
+  _composeConfirmMessage: (botUuid, customerId) => {
+    if (!FoodOrders.ongoingOrderHasAnyItem(botUuid, customerId)) {
+      return messageProcessor._composeTextMessage('いっらしゃいませ');
+    }
+
+    var orderDetail = messageProcessor._composeOrderReply(botUuid, customerId).text;
+
+    return {
+      type: 'template',
+      altText: `${orderDetail}`,
+      template: {
+        type: 'confirm',
+        text: orderDetail,
+        actions: [
+          {
+            type: 'postback',
+            label: 'Yes',
+            data: JSON.stringify({action: 'confirm'})
+          },
+          {
+            type: 'postback',
+            label: 'Cancel',
+            data: JSON.stringify({action: 'cancel'})
+          }
+        ]
+      }
+    };
+  },
+
   _sendMessage: (botUuid, customerId, replyToken, msgObject) => {
     var bot = Bots.get(botUuid);
     var httpResult = Messages.replyMessage({
@@ -97,10 +125,6 @@ export default messageProcessor = {
     });
   },
 
-// {"type":"postback","replyToken":"2d4f30e34a5b486cb93041d9d43b9a01",
-// "source":{"userId":"U2eba10baf511979f278405d130148750","type":"user"},
-// "timestamp":1480243098062,
-// "postback":{"data":"{\"action\":\"add\",\"item\":\"FLvTdEovMevEQWLZH\"}"}}
   _handlePostback: (botUuid, customerId, postback, replyToken) => {
     var data = JSON.parse(postback.data);
     if (typeof data !== 'object') {
@@ -116,10 +140,22 @@ export default messageProcessor = {
         case 'remove':
           FoodOrders.removeItem(botUuid, customerId, data.itemId);
           break;
+        case 'confirm':
+          FoodOrders.confirm(botUuid, customerId);
+          FoodCustomerStates.goToConfirmed(botUuid, customerId);
+          messageProcessor._sendMessage(
+            botUuid, customerId, replyToken,
+            {type: 'text', text: 'ご住所を伺ってよろしいでしょうか'});
+          // TODO send thank you message and ask user to share location
+          break;
+        case 'cancel':
+          FoodCustomerStates.goToStandBy(botUuid, customerId);
+          break;
       }
-      let replyMsg = messageProcessor._composeOrderReply(botUuid, customerId);
-      console.log(JSON.stringify(replyMsg));
-      messageProcessor._sendMessage(botUuid, customerId, replyToken, replyMsg);
+      if (data.action === 'add' || data.action === 'remove') {
+        let replyMsg = messageProcessor._composeOrderReply(botUuid, customerId);
+        messageProcessor._sendMessage(botUuid, customerId, replyToken, replyMsg);
+      }
     }
     // TODO
   },
@@ -132,26 +168,36 @@ export default messageProcessor = {
     }
 
     // if user is in FoodCustomerStates.STAND_BY and give `keywords` in text message
-    if (messageProcessor._containsBotKeywords(botUuid, msgBody) &&
+    if (typeof msgBody.text === 'string' &&
+        FoodKeywords.containsKeywords(botUuid, msgBody.text) &&
         FoodCustomerStates.isStandBy(botUuid, customerId)) {
       let menu = messageProcessor._composeMenu(botUuid);
+      let instruction = messageProcessor._composeTextMessage(
+        'ご注文は以上でよろしいたら、「お会計」や「checkout」などを入れてください');
       console.log(`got keyword, send menu`);
-      messageProcessor._sendMessage(botUuid, customerId, replyToken, menu);
+      messageProcessor._sendMessage(botUuid, customerId, replyToken, [menu, instruction]);
       FoodCustomerStates.goToOrdering(botUuid, customerId);
     } else if (FoodCustomerStates.isOrdering(botUuid, customerId)) {
       let billingWords = ['checkout', '会計', '勘定', '終', '完了', '以上', 'とりあえず'];
       var wantToCheckout = messageProcessor._containsWord(billingWords, msgBody);
       if (wantToCheckout) {
         console.log(`${customerId} want to checkout`);
-        // TODO: print all orders and confirm button
+        let confirmMsgObject = messageProcessor._composeConfirmMessage(botUuid, customerId);
+        messageProcessor._sendMessage(
+          botUuid, customerId, replyToken, confirmMsgObject);
       }
+    } else if (FoodCustomerStates.isConfirmed(botUuid, customerId) && msgBody.type === 'location') {
+      FoodOrders.storeAddress(botUuid, customerId, msgBody);
+      FoodCustomerStates.goToStandBy(botUuid, customerId);
+      var thankYouMsg = messageProcessor._composeTextMessage('ありがとうございます');
+      messageProcessor._sendMessage(botUuid, customerId, replyToken, thankYouMsg);
     } else {
       console.log(`got no keyword`);
     }
   },
 
   parse: (botUuid, msgEvent) => {
-    var allowedMsgEventTypes = ['message', 'postback'];
+    var allowedMsgEventTypes = ['message', 'postback', 'follow', 'unfollow'];
     messageProcessor._print(botUuid, msgEvent);
 
     // discard message if we are receiving it from group or others
@@ -166,10 +212,8 @@ export default messageProcessor = {
     // discard message if the bot is turned off
     if (!Bots.isOn(botUuid)) {
       console.warn(`${botUuid} is off or non-existed`);
-      messageProcessor._sendMessage(botUuid, customerId, replyToken, {
-        type: 'text',
-        text: '申し訳ありませんが、今は営業時間以外'
-      });
+      let appologizeMsg = messageProcessor._composeTextMessage('申し訳ありませんが、今は営業時間以外');
+      messageProcessor._sendMessage(botUuid, customerId, replyToken, appologizeMsg);
       return;
     }
 
@@ -179,6 +223,13 @@ export default messageProcessor = {
         break;
       case 'postback':
         messageProcessor._handlePostback(botUuid, customerId, msgEvent.postback, replyToken);
+        break;
+      case 'follow':
+        let keywords = FoodKeywords.getKeywords(botUuid);
+        let welcomeMessage = messageProcessor._composeTextMessage(`ご注文は「${keywords.join('」や「')}」を入れてください`);
+        messageProcessor._sendMessage(botUuid, customerId, replyToken, welcomeMessage);
+        break;
+      case 'unfollow':
         break;
     }
 
