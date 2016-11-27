@@ -15,6 +15,7 @@ Meteor.startup(() => {
   FoodKeywords.remove({});
   FoodCustomerStates.remove({});
   Bots.remove({});
+  // Don't delete record of FoodCustomers because it is fetched from LINE
 
   var settings = utils.ChannelSettings.get(SUSHI_BOT_UUID);
   var foodItemsData = [

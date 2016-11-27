@@ -1,9 +1,11 @@
 import { FoodItems } from '../../../food_items.js';
 import { FoodOrders } from '../../../food_orders.js';
 import { FoodKeywords } from '../../../food_keywords.js';
+import { FoodCustomers } from '../../../food_customers.js';
 import { FoodCustomerStates } from '../../../food_customer_states.js';
 import { Bots } from '../../../bots.js';
 import Messages from '/imports/messages';
+import Line from '/imports/line';
 
 export default messageProcessor = {
   _print: (botUuid, msgEvent) => {
@@ -56,7 +58,6 @@ export default messageProcessor = {
           label: 'ー１',
           data: JSON.stringify({action: 'remove', itemId: foodItem._id})
         }]
-        // thumbnailImageUrl
       };
     });
     return menu;
@@ -125,6 +126,20 @@ export default messageProcessor = {
     });
   },
 
+  _getCustomerProfile: (botUuid, customerId) => {
+    var bot = Bots.get(botUuid);
+    return Line.profile(customerId, bot.channelAccessToken);
+  },
+
+  _updateCustomerProfile: (botUuid, customerId) => {
+    var customerProfile = FoodCustomers.get(customerId);
+    if (!customerProfile) {
+      console.log(`we don't have profile of ${customerId}, fetch it from LINE`);
+      let lineProfile = messageProcessor._getCustomerProfile(botUuid, customerId);
+      FoodCustomers.renew(lineProfile);
+    }
+  },
+
   _handlePostback: (botUuid, customerId, postback, replyToken) => {
     var data = JSON.parse(postback.data);
     if (typeof data !== 'object') {
@@ -166,6 +181,9 @@ export default messageProcessor = {
       FoodCustomerStates.goToStandBy(botUuid, customerId);
       return;
     }
+
+    // update customer data if we don't have it
+    messageProcessor._updateCustomerProfile(botUuid, customerId);
 
     // if user is in FoodCustomerStates.STAND_BY and give `keywords` in text message
     if (typeof msgBody.text === 'string' &&
@@ -228,6 +246,7 @@ export default messageProcessor = {
         let keywords = FoodKeywords.getKeywords(botUuid);
         let welcomeMessage = messageProcessor._composeTextMessage(`ご注文は「${keywords.join('」や「')}」を入れてください`);
         messageProcessor._sendMessage(botUuid, customerId, replyToken, welcomeMessage);
+        FoodCustomers.renew(messageProcessor._getCustomerProfile(botUuid, customerId));
         break;
       case 'unfollow':
         break;
