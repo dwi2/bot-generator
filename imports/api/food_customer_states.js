@@ -70,3 +70,13 @@ FoodCustomerStates.goToOrdering = (botUuid, customerId) => {
   FoodCustomerStates._updateStateOf(botUuid, customerId, FoodCustomerStates.ORDERING);
 };
 
+FoodCustomerStates.goToConfirmed = (botUuid, customerId) => {
+  var currentState = FoodCustomerStates._getStateOf(botUuid, customerId);
+  if (currentState !== FoodCustomerStates.ORDERING) {
+    console.warn(`Unexpecting state transition: bot = ${botUuid}, customer = ${customerId}`);
+    return;
+  }
+  FoodCustomerStates._updateStateOf(botUuid, customerId, FoodCustomerStates.CONFIRMED);
+};
+
+
