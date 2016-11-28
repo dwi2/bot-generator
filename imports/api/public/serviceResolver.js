@@ -10,8 +10,8 @@ const handler = ({provider, data}, promise) => {
   try {
     const targetServiceProvider = providers[provider];
     if (targetServiceProvider) {
-      targetServiceProvider(data);
-      promise.resolve(`Handled request with ${provider} handler`);
+      var result = targetServiceProvider(data) || `Handled request with ${provider} handler`;
+      promise.resolve(result);
     } else {
       throw new Error(`No ${provider} handler available`);
     }

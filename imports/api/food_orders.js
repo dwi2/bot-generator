@@ -3,13 +3,6 @@ import { Meteor } from 'meteor/meteor';
 
 export const FoodOrders = new Mongo.Collection('food_orders');
 
-// id: uuid
-// items: array
-// botUuid:
-// customerId
-// confirmed: boolean
-// location: string or object?
-
 FoodOrders.getOngoingOne = (botUuid, customerId) => {
   var ongoingOrder = FoodOrders.findOne({
     botUuid: botUuid,
@@ -61,6 +54,10 @@ FoodOrders.getConfirmedOne = (botUuid, customerId) => {
     customerId: customerId,
     confirmed: true
   });
+};
+
+FoodOrders.getAllOf = (botUuid) => {
+  return FoodOrders.find({botUuid: botUuid}).fetch();
 };
 
 FoodOrders.storeAddress = (botUuid, customerId, address) => {
