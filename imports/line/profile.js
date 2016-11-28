@@ -6,14 +6,19 @@ let profile = (lineUserId, channelAccessToken) => {
     return;
   }
 
-  let result = HTTP.get(endpoint, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${channelAccessToken}`
-    }
-  });
+  var result;
+  try {
+    result = HTTP.get(endpoint, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${channelAccessToken}`
+      }
+    });
+  } catch (e) {
+    console.warn(e);
+    return;
+  }
 
-  // TODO error handling?
   return result.data;
 };
 
