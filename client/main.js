@@ -20,3 +20,7 @@ FlowRouter.route('/userinfo.html', {
     });
   },
 });
+
+Template.app.onRendered(function () {
+  $(document).foundation();
+});
